@@ -24,7 +24,7 @@ date_first_vid <-  published$Published %>% min() %>% as.character()
 date_first_vid <- paste0(substr(date_first_vid,9,10),"/",substr(date_first_vid,6,7),"/",substr(date_first_vid,1,4))
 ```
 <body>
-  <img src="../../9_Misc/DfE_Logo.svg" width="150">               </img><img src="../../9_Misc/Youtube_Logo.svg" width="150"></img>
+  <img src="../../9_Misc/Org_Logo.svg" width="150">               </img><img src="../../9_Misc/Youtube_Logo.svg" width="150"></img>
   <h2 class="title"><b>Analysis of `r channel_name`'s YouTube Channel</b></h2>
   <hr/>
   <h4 id="Contents"><b>Contents</b></h4>
