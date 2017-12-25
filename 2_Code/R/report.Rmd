@@ -1,0 +1,404 @@
+---
+output: 
+  html_document:
+---
+
+<head>
+  <style>
+  .title{
+    text-align: center;
+    font-style: bold;
+  }
+  </style>
+</head>
+```{r setup,include=FALSE}
+library(tidyverse)
+library(knitr)
+library(plotly)
+```
+
+```{r,include=FALSE}
+published <- read_csv("../../1_Data/Published.csv")
+no_vids <- published %>% nrow()
+date_first_vid <-  published$Published %>% min() %>% as.character()
+date_first_vid <- paste0(substr(date_first_vid,9,10),"/",substr(date_first_vid,6,7),"/",substr(date_first_vid,1,4))
+```
+<body>
+  <img src="../../9_Misc/DfE_Logo.svg" width="150">               </img><img src="../../9_Misc/Youtube_Logo.svg" width="150"></img>
+  <h2 class="title"><b>Analysis of `r channel_name`'s YouTube Channel</b></h2>
+  <hr/>
+  <h4 id="Contents"><b>Contents</b></h4>
+  1. <a href="#Overview">Overview</a>
+  2. <a href="#Vid_Views">Video Views</a>
+  3. <a href="#Vid_Engage">Video Engagement</a>
+  4. <a href="#Next_Steps">Uses and Next Steps</a>
+  
+  <hr/>
+  <h4 id="Overview"><b>Overview</b> (<a href="#Contents">back to contents</a>)</h4>
+  The `r channel_name`'s YouTube channel (user name of `r channel_youtube`, available <a href="http://www.youtube.com/user/`r channel_youtube`">here</a>). There are `r no_vids` videos on the channel and a video was first posted on the channel on `r date_first_vid`.<br/><br/>
+  The graph below shows the number of videos posted, per week, since the channel's first video was posted.
+```{r,include=FALSE,warning=FALSE}
+published <- published %>% mutate(Week = format(published$Published, format="%Y-%U"))
+pub_week <- published %>% group_by(Week) %>% summarise(Count_Week = n())
+all_weeks <- data.frame("Date" = seq(as.Date(published$Published %>% min() %>% as.character()), 
+                 as.Date(published$Published %>% max() %>% as.character()), "weeks"),
+                 "Week" = seq(as.Date(published$Published %>% min() %>% as.character()), 
+                 as.Date(published$Published %>% max() %>% as.character()), "weeks") %>%
+  format(format="%Y-%U"))
+
+pub_week <- all_weeks %>% left_join(pub_week,"Week") %>% mutate(Count_Week = ifelse(is.na(Count_Week),0,Count_Week))
+rm(all_weeks)
+
+time_series_volumes <- ggplot(pub_week,aes(Date,Count_Week)) +
+  geom_line() +
+  theme_minimal() +
+  ylab("Number of Videos Posted") +
+  theme()
+
+time_series_volumes <- time_series_volumes %>% ggplotly()
+
+time_series_volumes$x[[1]][[1]]$text <- paste0("Week Commencing: ",
+                                              pub_week$Date,
+                                              "<br />No. of Video: ",
+                                              pub_week$Count_Week)
+
+```
+```{r,echo=FALSE}
+time_series_volumes
+```
+  <hr/>
+  <h4 id="Vid_Views"><b>Video Views</b> (<a href="#Contents">back to contents</a>)</h4>
+The top 10 videos (less if the channel has less than 10 videos overall) with the most views per day are in the table below.
+```{r top_vids, echo=FALSE}
+if (nrow(published) > 10){
+  top_vids <- published %>% 
+    arrange(-Views_per_Day) %>% 
+    select(Title,`Views per Day` = Views_per_Day)
+  top_vids <- top_vids[c(1:10),]
+}else{
+  top_vids <- published %>%
+    arrange(-Views_per_Day) %>% 
+    select(Title,`Views per Day` = Views_per_Day)
+}
+
+
+kable(top_vids)
+```  
+
+``` {r less_1_view, echo=FALSE}
+less_1_view <- ifelse(nrow(published %>% filter(Views_per_Day < 1)) != 0,
+  paste0(round(nrow(published %>% filter(Views_per_Day < 1))/no_vids*100,1),"% of"),
+  'none')
+```
+
+At the other end, there are `r less_1_view` videos with less than 1 view per day.
+  
+The graph below shows the distribution of views per day, since publication, for all videos on `r channel_youtube`:
+```{r include=FALSE,warning=FALSE}
+dist_views_per_day <- ggplot(published, aes(Views_per_Day)) + 
+  geom_histogram(binwidth = 1) +
+  xlab("Views per Day") +
+  ylab("Number of Videos") +
+  theme_minimal()
+
+dist_views_per_day <- dist_views_per_day %>% ggplotly()
+
+dist_views_per_day$x[[1]][[1]]$text <- gsub("count","Count",dist_views_per_day$x[[1]][[1]]$text)
+dist_views_per_day$x[[1]][[1]]$text <- gsub("Views_per_Day","Views per Day",dist_views_per_day$x[[1]][[1]]$text)
+
+```
+```{r, echo=FALSE}
+dist_views_per_day
+```
+
+```{r average,echo=FALSE}
+average_views <- published %>% 
+  group_by() %>% 
+  summarise(Ave = mean(Count)) %>% 
+  as.numeric() %>% 
+  round(0)
+
+average_views_per_day <- published %>% 
+  group_by() %>% 
+  summarise(Ave = mean(Views_per_Day)) %>% 
+  as.numeric() %>% 
+  round(0)
+```
+
+The average views for all videos is `r average_views` and the average views per day is `r average_views_per_day`.
+
+The graph below, showing when a video was published and its popularity through number of views, can be used to see whether a channel's content is appearing more or less popular over time. 
+
+One thing that must be accounted for with this graph is that popularity is likely to decay over time, so if a video is published today it is likely to receive more views tomorrow than it is in 6 months time, which may account for any decay in popularity. A trend line has been included to indicate any long term changes.
+```{r echo=FALSE,warning=FALSE,include=FALSE}
+views_v_age <- ggplot(published, aes(Published,Views_per_Day)) + 
+  geom_point() + 
+  geom_smooth(method="lm", colour="red", lwd=1.1, se=FALSE)+
+  xlab("Date Published") +
+  ylab("Views per Day") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+views_v_age <- views_v_age %>% ggplotly()
+
+views_v_age$x[[1]][[1]]$text <- gsub(".*>","",views_v_age$x[[1]][[1]]$text)
+views_v_age$x[[1]][[1]]$text <- gsub("Views_per_Day","Views per Day",views_v_age$x[[1]][[1]]$text)
+
+views_v_age$x[[1]][[1]]$text <- paste0(published$Title,"<br />",views_v_age$x[[1]][[1]]$text)
+views_v_age$x[[1]][[2]]$text <- ''
+
+```
+```{r, echo=FALSE}
+views_v_age
+```
+YouTube assigns videos 'tags' - themes of the video. This allows videos to be categorised. We can calculate which tags are the most popular (the most average views per day). For this analysis, any tag with only one video associated with it has been excluded.
+
+The table below shows the top 10 tags in terms of views per day of videos with that tag.
+```{r load_tags, include=FALSE}
+tag_analysis <- read_csv("../../1_Data/Tag_Analysis.csv") %>% 
+  filter(Count_Videos > 1) %>% 
+  mutate(Average_Views_Per_Day_Rnd = Average_Views_Per_Day %>% round(1))
+```
+```{r top_vids_tags, echo=FALSE}
+if (nrow(tag_analysis) > 10){
+  top_vids_tags <- tag_analysis %>% 
+    arrange(-Average_Views_Per_Day) %>% 
+    select(Tag,`Average Views per Day` = Average_Views_Per_Day_Rnd)
+  top_vids_tags <- top_vids_tags[c(1:10),]
+}else{
+  top_vids_tags <- tag_analysis %>%
+    arrange(-Average_Views_Per_Day) %>% 
+    select(Tag,`Average Views per Day` = Average_Views_Per_Day_Rnd)
+}
+
+
+kable(top_vids_tags)
+``` 
+
+The table below shows the bottom 10 tags in terms of views per day of videos with that tag.
+```{r bot_vids_tags, echo=FALSE}
+if (nrow(tag_analysis) > 10){
+  bot_vids_tags <- tag_analysis %>% 
+    arrange(Average_Views_Per_Day) %>% 
+    select(Tag,`Average Views per Day` = Average_Views_Per_Day_Rnd)
+  bot_vids_tags <- bot_vids_tags[c(1:10),]
+}else{
+  bot_vids_tags <- tag_analysis %>%
+    arrange(Average_Views_Per_Day) %>% 
+    select(Tag,`Average Views per Day` = Average_Views_Per_Day_Rnd)
+}
+
+
+kable(bot_vids_tags)
+```
+
+There may well be tags in the above table which mean nothing - these should be investigated when uploading videos.
+
+The graph below shows the number of videos posted against the average views per day from each tag. Those tags above the top red line are video themes which have a higher viewing rate than would be expected for the number of videos with that tag, given variation in each video's interest and quality. Consideration should be made as to whether increasing the number of videos of this theme.
+
+Conversely, those below the bottom red line are themes of videos which perform more poorly than expected for that number of videos - consideration should be made as to whether videos of these themes should be continued to be produced.
+
+```{r tag_analysis, echo=FALSE,warning=FALSE,include=FALSE}
+funnel_tag_analysis <- data.frame(`Count_Videos`=log(tag_analysis$Count_Videos),
+                                  `Average_Views_Per_Day`=log(tag_analysis$Average_Views_Per_Day))
+
+m <- lm(Average_Views_Per_Day ~ Count_Videos, funnel_tag_analysis) 
+fit99 <- predict(m, interval="conf", level=.99)
+
+funnel_tag_analysis <- cbind.data.frame(funnel_tag_analysis, 
+                       lwr99=fit99[,"lwr"],  upr99=fit99[,"upr"])
+
+tag_analysis_chart <- ggplot(funnel_tag_analysis,aes(x=Count_Videos,y=Average_Views_Per_Day)) +
+  geom_point(aes(text=sprintf(tag_analysis$Tag))) + 
+  geom_line(aes(y = upr99), color="red", linetype=2) + 
+  geom_line(aes(y = lwr99), color="red", linetype=2) +
+  theme_minimal() +
+  xlab("Number of Videos Posted") +
+  ylab("Average Views per Day") +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+tag_analysis_chart <- tag_analysis_chart %>% ggplotly()
+
+tag_analysis_chart$x[[1]][[1]]$text <- gsub("<.*","",tag_analysis_chart$x[[1]][[1]]$text)
+tag_analysis_chart$x[[1]][[1]]$text <- paste0(tag_analysis_chart$x[[1]][[1]]$text,
+                                              "<br />Average Views per Day: ",
+                                              tag_analysis$Average_Views_Per_Day_Rnd,
+                                              "<br />Number of Videos Posted: ",
+                                              tag_analysis$Count_Videos)
+
+tag_analysis_chart$x[[1]][[2]]$text <- ''
+tag_analysis_chart$x[[1]][[3]]$text <- ''
+```
+```{r,echo=FALSE}
+tag_analysis_chart
+```
+  <hr/>
+  <h4 id="Vid_Engage"><b>Video Engagement</b> (<a href="#Contents">back to contents</a>)</h4>
+  <h5>Likes versus Dislikes, by Video</h5>
+Here we can see how much YouTube users are engaging with the videos, either through liking or disliking the video. Videos in the top left are proportionately the least popular, and those in the bottom right are proportionately the most popular. A line showing equal numbers of likes and dislikes is included for reference. Those above the line have a higher proportion of dislikes to likes, and those below the line have a higher proportion of likes to dislikes - so appear to be more popular.
+
+```{r,include=FALSE}
+like_dislike_title <- read_csv("../../1_Data/Likes_Dislikes_Titles.csv")
+perc_like_dislike <- ifelse(nrow(like_dislike_title %>% filter(Likes == 0 & Dislikes == 0)) == 0,
+                            "no",
+                            paste0(round(nrow(like_dislike_title %>% filter(Likes == 0 & Dislikes == 0))/no_vids*100,1),"% of the"))
+like_dislike_title <- like_dislike_title %>% filter(Likes > 0 | Dislikes > 0)
+```
+
+Those with no likes or dislikes are excluded. This excludes `r perc_like_dislike` videos.
+
+```{r,include=FALSE}
+like_dislike_title_chart <- ggplot() +
+  geom_point(data = like_dislike_title,aes(log(Likes),log(Dislikes)),pch=1,size=2)+
+  geom_line(aes(x=c(0,max(log(like_dislike_title$Likes))),
+                y=c(0,max(log(like_dislike_title$Likes)))),
+            col='red') +
+  theme_minimal() +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  xlab("Likes") +
+  ylab("Dislikes")
+
+like_dislike_title_chart <- like_dislike_title_chart %>% ggplotly()
+
+like_dislike_title_chart$x[[1]][[1]]$text <- paste0(like_dislike_title$Title,
+                                              "<br />Likes: ",
+                                              like_dislike_title$Likes,
+                                              "<br />Dislikes: ",
+                                              like_dislike_title$Dislikes)
+
+like_dislike_title_chart$x[[1]][[2]]$text <- ''
+```
+```{r,echo=FALSE}
+like_dislike_title_chart
+```
+  <h5>Likes/Dislikes versus Views, by Tag</h5>
+We can now see which tags generate the highest proportion of likes and dislikes.
+```{r,include=FALSE}
+like_dislike_tag <- read_csv("../../1_Data/Likes_Dislikes_Tags.csv")
+
+like_dislike_tag_chart <- ggplot() +
+  geom_point(data = like_dislike_tag,aes(log(Sum_Likes),log(Sum_Dislikes)),pch=1,size=2)+
+  geom_line(aes(x=c(0,max(log(like_dislike_tag$Sum_Likes))),
+                y=c(0,max(log(like_dislike_tag$Sum_Likes)))),
+            col='red') +
+  theme_minimal() +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  xlab("Likes") +
+  ylab("Dislikes")
+
+like_dislike_tag_chart <- like_dislike_tag_chart %>% ggplotly()
+
+like_dislike_tag_chart$x[[1]][[1]]$text <- paste0(like_dislike_tag$Tag,
+                                              "<br />Likes: ",
+                                              like_dislike_tag$Sum_Likes,
+                                              "<br />Dislikes: ",
+                                              like_dislike_tag$Sum_Dislikes)
+
+like_dislike_tag_chart$x[[1]][[2]]$text <- ''
+
+```
+```{r,echo=FALSE}
+like_dislike_tag_chart
+```
+
+<h5>Comments</h5>
+```{r comments,include=FALSE}
+comments_titles <- read_csv("../../1_Data/Likes_Dislikes_Titles.csv")
+perc_vids_comments <- ifelse(nrow(comments_titles %>% filter(Comments > 0)) == 0,
+                             "none of the",
+                             paste0(round(nrow(comments_titles %>% filter(Comments > 0))/no_vids*100,1),
+                                    "% of"))
+comments_tags <- read_csv("../../1_Data/Likes_Dislikes_Tags.csv")
+```
+We can also analyse the comments on the videos. Of the videos on the channel, `r perc_vids_comments` videos have comments on them.
+
+The graph below shows the number of comments on each video, relative to the number of views. Videos with a high number of comments relative to their views are those that generate high engagement.
+
+This graph only includes those with one or more comments.
+
+```{r,include=FALSE}
+comments_title_chart <- ggplot() +
+  geom_point(data = comments_titles,aes(Views,Comments),pch=1,size=2)+
+  theme_minimal() +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  xlab("Views") +
+  ylab("Comments")
+
+comments_title_chart <- comments_title_chart %>% ggplotly()
+
+comments_title_chart$x[[1]][[1]]$text <- paste0(comments_titles$Title,
+                                              "<br />Views: ",
+                                              comments_titles$Views,
+                                              "<br />Comments: ",
+                                              comments_titles$Comments)
+```
+```{r,echo=FALSE}
+comments_title_chart
+```
+We can also look at comments by different tags. By looking at both it might be possible to get explanations as to why certain videos attract more comments - some themes might be more popular conversation areas.
+```{r,include=FALSE}
+comments_tags_chart <- ggplot() +
+  geom_point(data = comments_tags,aes(Sum_Views,Sum_Comments),pch=1,size=2)+
+  theme_minimal() +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  xlab("Views") +
+  ylab("Comments")
+
+comments_tags_chart <- comments_tags_chart %>% ggplotly()
+
+comments_tags_chart$x[[1]][[1]]$text <- paste0(comments_tags$Tag,
+                                              "<br />Views: ",
+                                              comments_tags$Sum_Views,
+                                              "<br />Comments: ",
+                                              comments_tags$Sum_Comments)
+```
+```{r,echo=FALSE}
+comments_tags_chart
+```
+We can also identify the authors who post comments, to see if these comments are randomly spread amongst contributors, or there are contributors that are significantly more active than others.
+
+```{r authors,include=FALSE}
+authors <- read_csv("../../1_Data/Comment_Authors.csv") %>% 
+  group_by(Authors) %>% 
+  summarise(Count_of = n())
+
+dist_authors <- ggplot(authors, aes(Count_of)) + 
+  geom_histogram(binwidth = 1) +
+  xlab("Number of Comments") +
+  ylab("Number of Authors") +
+  theme_minimal()
+
+dist_authors <- dist_authors %>% ggplotly()
+
+dist_authors$x[[1]][[1]]$text <- gsub("count","Number of Authors",dist_authors$x[[1]][[1]]$text)
+dist_authors$x[[1]][[1]]$text <- gsub("Count_of","Number of Comments",dist_authors$x[[1]][[1]]$text)
+
+```
+```{r, echo=FALSE}
+dist_authors
+```
+
+  <hr/>
+  <h4 id="Next_Steps"><b>Uses and Next Steps</b> (<a href="#Contents">back to contents</a>)</h4>
+This analysis provides an evaluation of `r channel_name`'s YouTube channel, so could have the following uses:
+
+* Assessment of the impact of the channel
+* Support in the approach for new videos and content
+* Identification of key participants who engage with the videos
+
+</body>
