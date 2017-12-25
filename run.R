@@ -1,10 +1,10 @@
 library(rmarkdown)
 
 #Human readable channel name
-channel_name <- 'Department for Education'
+channel_name <- 'CHANNEL NAME'
 
 #Name of channel user name, found in URL
-channel_youtube <- 'educationgovuk'
+channel_youtube <- 'CHANNEL URL NAME'
 
 rmarkdown::render('/2_Code/R/report.Rmd',
                   output_file =  "channel_report.html", 
